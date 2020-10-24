@@ -198,7 +198,7 @@ def callback_query(call):
 
         elif call.data == 'statistic':
             if users[str(call.message.chat.id)][0] == None:
-                bot.send_message(call.message.chat.id, "Ух ты! похоже у вас не настроена ваша постоянная локация!")
+                bot.send_message(call.message.chat.id, "Ух ты! Похоже у вас не настроена ваша постоянная локация!")
                 text = bot.send_message(call.message.chat.id, "Давайте настроим!\n Отправьте ваш постоянный регион")
                 bot.register_next_step_handler(text, obrabotka)
             # TODO сделать отправление статистики
