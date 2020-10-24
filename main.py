@@ -78,6 +78,11 @@ REGIONS_KEYS = list(REGIONS.values())
 token = '1383445486:AAExUfb7qDLtP7DsaYAZiSd6p_3hfPU1Qgc'
 bot = telebot.TeleBot(token)
 
+def get_key(d, value):
+    for k, v in d.items():
+        if v == value:
+            return k
+
 def save_users(users):
     with open('users.txt', 'w') as outfile:
         json.dump(users, outfile)
@@ -163,10 +168,11 @@ def obrabotka_location(message):
         location = geolocator.reverse(f"{str(message.location.latitude)}, {str(message.location.longitude)}")
         city = str(location).split(', ')[5]
         try:
-            code = REGIONS[city]
+            code = (difflib.get_close_matches(str(message.text), REGIONS_KEYS))[0]
         except:
             code = 'None'
-        bot.send_message(message.chat.id, f'Ваш город: {city}\nКод города: {code}',  reply_markup=back_menu())
+        users[str(call.message.chat.id)][0] = code
+        bot.send_message(message.chat.id, f'Ваш город: {REGIONS[code]}\nКод города: {code}',  reply_markup=back_menu())
     else:
         try:
             bot.delete_message(message.chat.id, message.message_id)
@@ -177,7 +183,7 @@ def obrabotka_location(message):
 def obrabotka(message):
     reg = difflib.get_close_matches(str(message.text), REGIONS_KEYS)
     print(reg)
-    users[str(message.chat.id)][0] = reg[0]
+    users[str(message.chat.id)][0] = get_key(reg[0])
     save_users(users)
     bot.send_message(message.chat.id, f"Ваш регион был установлен на {reg[0]}", reply_markup=menu())
 
