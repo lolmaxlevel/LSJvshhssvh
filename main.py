@@ -6,11 +6,13 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMedia
 import schedule
 import time
 import threading
+from geopy.geocoders import Nominatim
 
 users = {}
 with open('users.txt') as json_file:
     users = json.load(json_file)
     print(users.keys())
+    
 REGIONS = {'европа': '111', 'СНГ': '166', 'Универсальное': '318', 'Азия': '183', 'Россия': '225', 'Северо-Западный '
                                                                                                   'федеральный '
                                                                                                   'округ': '17',
@@ -112,10 +114,6 @@ def listener(messages):
 bot.set_update_listener(listener)
 
 
-def coord_to_location(latitude, longitude):
-    return requests.get()
-
-
 def menu():
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
@@ -143,6 +141,24 @@ def back_menu():
     markup.add(back)
     return markup
 
+
+def obrabotka_location(message):
+    if message.content_type == 'location':
+        bot.delete_message(message.chat.id, message.message_id)
+        geolocator = Nominatim(user_agent="tg_bot")
+        location = geolocator.reverse(f"{str(message.location.latitude)}, {str(message.location.longitude)}")
+        city = str(location).split(', ')[5]
+        try:
+            code = REGIONS[city]
+        except:
+            code = 'None'
+        bot.send_message(message.chat.id, f'Ваш город: {city}\nКод города: {code}',  reply_markup=back_menu())
+    else:
+        try:
+            bot.delete_message(message.chat.id, message.message_id)
+        except:
+            pass
+        bot.send_message(message.chat.id, "Похоже вы отправили мне не то. Повторите попытку:", reply_markup=menu())
 
 def obrabotka(message):
     users[str(message.chat.id)] = message.text
@@ -188,13 +204,16 @@ def callback_query(call):
             bot.edit_message_text("Выбери предмет:", call.message.chat.id, call.message.message_id, reply_markup=menu())
 
         elif call.data == "back1":
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(call.message.chat.id, "Выбери предмет:", reply_markup=menu())
+            bot.edit_message_text("Всем привет ето коронавирус бот тут мы будем слать вам спам и рофлан приколы", call.message.chat.id, call.message.message_id, reply_markup=menu())
 
         elif call.data == 'logs':
             logs_txt = open('logs.txt', 'rb')
             bot.send_document(call.message.chat.id, logs_txt)
             logs_txt.close()
+
+        elif call.data == 'statistic_by_location':
+            location = bot.edit_message_text('Если хочешь узнать статистику по коронавирусу в своем регионе, просто отправь мне свою геолокацию. Если ты хочешь добавить какой-либо город как постоянный, воспользуйся кнопкой "Статистика" в главном меню.', call.message.chat.id, call.message.message_id,)
+            bot.register_next_step_handler(location, obrabotka_location)
 
         elif call.data == 'statistic':
             if users[str(call.message.chat.id)][0] == None:
