@@ -10,7 +10,7 @@
 
 
 
-![](https://media.tenor.com/images/152d1fef2bec45c8f265c788dce0a8f7/tenor.gif)
+![](https://sun9-32.userapi.com/x65VE5FQnd4HxxdEHjphzh2Ue4makbDlBDbkMA/u_uBKFVePv0.jpg)
 
 
 ♂Fucking slave♂ к вашим услугам
