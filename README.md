@@ -1,4 +1,4 @@
-# ♂Fucking slave♂ для настоящего ♂ Gay Sex ♂
+# ♂Fucking slave♂ для настоящего ♂Gay Sex♂
 
 
 - ♂Dungeon Master♂ присылает каждый день ♂Semen♂ со смешной картинкой) 
