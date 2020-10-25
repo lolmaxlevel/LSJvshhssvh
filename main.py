@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import requests
 import json
 import datetime
@@ -10,16 +11,16 @@ from geopy.geocoders import Nominatim
 import difflib
 import news.govno
 import image.image
+import random
 from PIL import Image, ImageDraw, ImageFont
 
 token = '1229958568:AAEBxq5OwU3lS8mXax6kIu7eQ1wBd8ak15Y'  # bot constants
 bot = telebot.TeleBot(token)
 
-users = {}                              # constants for db
+users = {}  # constants for db
 with open('users.txt') as json_file:
     users = json.load(json_file)
     print(users.keys())
-
 
 REGIONS = {'111': 'европа', '166': 'СНГ', '318': 'Универсальное', '183': 'Азия', '225': 'Россия',
            '17': 'Северо-Западный федеральный округ', '10857': 'Калининградская область', '22': 'Калининград',
@@ -79,7 +80,7 @@ REGIONS = {'111': 'европа', '166': 'СНГ', '318': 'Универсаль�
            '10251': 'Чукотский автономный округ', '11458': 'Анадырь', '11398': 'Камчатский край',
            '78': 'Петропавловск-Камчатский', '11403': 'Магаданская область', '79': 'Магадан',
            '11450': 'Сахалинская область', '80': 'Южно-Сахалинск', '11457': 'Хабаровский край', '76': 'Хабаровск',
-           '11453': 'Комсомольск-на-Амуре'}                          # constants for statistic
+           '11453': 'Комсомольск-на-Амуре'}  # constants for statistic
 REGIONS_KEYS = list(REGIONS.values())
 
 
@@ -105,13 +106,17 @@ def save_users(users):
 def send_message():
     title = news.govno.ones(news.govno.news)
     for i in list(users.keys()):
-        stat = get_statistic((users[str(i)])[0])
-        bot.send_photo(i, image.image.gen_text(str(stat["cases"]), str(stat["deaths"]), str(stat["cured"]),
-                                                    str(stat["cases_delta"]),
-                                                    str(stat["deaths_delta"]), str(stat["cured_delta"])),
-                       caption=f"Ежедневаная рассылка, что бы отписаться зайдите в настройки\n"
-                               f"А главная нововсть прошедшего дня:\n<a href='{title[1]}'>{title[0]}</a>",
-                                                                                            parse_mode='HTML')
+        try:
+            stat = get_statistic((users[str(i)])[0])
+            bot.send_photo(i, image.image.gen_text(str(stat["cases"]), str(stat["deaths"]), str(stat["cured"]),
+                                                   str(stat["cases_delta"]),
+                                                   str(stat["deaths_delta"]), str(stat["cured_delta"])),
+                           caption=f"Ежедневаная рассылка, что бы отписаться зайдите в настройки\n"
+                                   f"А главная нововсть прошедшего дня:\n<a href='{title[1]}'>{title[0]}</a>",
+                           parse_mode='HTML')
+        except:
+            pass
+
 
 schedule.every().day.at("15:55").do(send_message)
 title = news.govno.ones(news.govno.news)
@@ -122,6 +127,7 @@ def schedule_task():
     while True:
         schedule.run_pending()
         time.sleep(1)
+
 
 x = threading.Thread(target=schedule_task)
 x.start()
@@ -148,7 +154,8 @@ def menu():
     statistic = InlineKeyboardButton("Статистика", callback_data="statistic")
     statistic_by_location = InlineKeyboardButton("Статистика региона по вашей локации",
                                                  callback_data="statistic_by_location")
-    markup.add(settings, statistic, statistic_by_location)
+    news = InlineKeyboardButton("Сводка новостей", callback_data="news")
+    markup.add(settings, statistic, statistic_by_location, news)
     return markup
 
 
@@ -186,6 +193,18 @@ def choose_no():
     return markup
 
 
+def obrabotka_new_location(message):
+    try:
+        reg = difflib.get_close_matches(str(message.text), REGIONS_KEYS)
+        print(reg)
+        users[str(message.chat.id)][0] = get_key(reg[0])
+        save_users(users)
+        bot.send_message(message.chat.id, f'Вы сменили свою локацию на {reg[0]}',
+                         reply_markup=menu())
+    except Exception as e:
+        bot.send_message(message.chat.id, "Вы ввели какую-то белебрду, попробуйте снова", reply_markup=menu())
+
+
 def obrabotka_location(message):
     if message.content_type == 'location':
         bot.delete_message(message.chat.id, message.message_id)
@@ -200,11 +219,11 @@ def obrabotka_location(message):
             users[str(message.chat.id)][0] = get_key(code)
             save_users(users)
         stat = get_statistic((users[str(message.chat.id)])[0])
-        bot.send_message(message.chat.id,f'Статистика по региону: {stat["full_name"]}\n'
-                              f'Всего заражено: {stat["cases"]} новых случаев {stat["cases_delta"]}\n'
-                              f'Выздоровело: {stat["cured"]} новых случаев {stat["cured_delta"]}\n'
-                              f'Умерло: {stat["deaths"]} новых случаев {stat["deaths_delta"]}',
-                              reply_markup=back_menu())
+        bot.send_message(message.chat.id, f'Статистика по региону: {stat["full_name"]}\n'
+                                          f'Всего заражено: {stat["cases"]} новых случаев {stat["cases_delta"]}\n'
+                                          f'Выздоровело: {stat["cured"]} новых случаев {stat["cured_delta"]}\n'
+                                          f'Умерло: {stat["deaths"]} новых случаев {stat["deaths_delta"]}',
+                         reply_markup=back_menu())
     else:
         try:
             bot.delete_message(message.chat.id, message.message_id)
@@ -220,13 +239,14 @@ def obrabotka(message):
         users[str(message.chat.id)][0] = get_key(reg[0])
         save_users(users)
         stat = get_statistic(get_key(reg[0]))
-        bot.send_message(message.chat.id, f'Статистика по региону: {stat["full_name"]}\n'
-                                          f'Всего заражено: {stat["cases"]} новых случаев {stat["cases_delta"]}\n'
-                                          f'Выздоровело: {stat["cured"]} новых случаев {stat["cured_delta"]}\n'
-                                          f'Умерло: {stat["deaths"]} новых случаев {stat["deaths_delta"]}',
-                         reply_markup=back_menu())
+        bot.send_message(message.chat.id, f'<b>Статистика по региону</b>:\n<i>{stat["full_name"]}</i>\n'
+                              f'<b>Всего заражено</b>:\n<i>{stat["cases"]}</i> новых случаев <i>{stat["cases_delta"]}</i>\n'
+                              f'<b>Выздоровело</b>:\n<i>{stat["cured"]}</i> новых случаев <i>{stat["cured_delta"]}</i>\n'
+                              f'<b>Умерло</b>:\n<i>{stat["deaths"]}</i> новых случаев <i>{stat["deaths_delta"]}</i>'
+                         ,
+                         parse_mode='HTML', reply_markup=back_menu())
     except Exception as e:
-        bot.send_message(message.chat.id,"Вы ввели какую-то белебрду, попробуйте снова", reply_markup=menu())
+        bot.send_message(message.chat.id, "Вы ввели какую-то белебрду, попробуйте снова", reply_markup=menu())
 
 
 @bot.message_handler(commands=['start'])
@@ -306,12 +326,25 @@ def callback_query(call):
                 bot.register_next_step_handler(text, obrabotka)
             else:
                 stat = get_statistic((users[str(call.message.chat.id)])[0])
-                bot.edit_message_text(f'Статистика по региону: {stat["full_name"]}\n'
-                                      f'Всего заражено: {stat["cases"]} новых случаев {stat["cases_delta"]}\n'
-                                      f'Выздоровело: {stat["cured"]} новых случаев {stat["cured_delta"]}\n'
-                                      f'Умерло: {stat["deaths"]} новых случаев {stat["deaths_delta"]}',
-                                      call.message.chat.id, call.message.message_id, reply_markup=back_menu())
+                bot.edit_message_text(f'<b>Статистика по региону</b>:\n<i>{stat["full_name"]}</i>\n'
+                                      f'<b>Всего заражено</b>:\n<i>{stat["cases"]}</i> новых случаев <i>{stat["cases_delta"]}</i>\n'
+                                      f'<b>Выздоровело</b>:\n<i>{stat["cured"]}</i> новых случаев <i>{stat["cured_delta"]}</i>\n'
+                                      f'<b>Умерло</b>:\n<i>{stat["deaths"]}</i> новых случаев <i>{stat["deaths_delta"]}</i>',
+                                      call.message.chat.id, call.message.message_id, parse_mode='HTML', reply_markup=back_menu())
+        elif call.data == "setup_location":
+            text = bot.send_message(call.message.chat.id, "Что бы сменить постоянную локацию просто напишите новую!")
+            bot.register_next_step_handler(text, obrabotka_new_location)
+        elif call.data == 'news':
+            news_list = news.govno.mnogo(news.govno.news)
+            news_str = ''
+            for i in range(1, 6):
+                news_str += f"{str(i)}. <a href='{news_list[i][1]}'>{news_list[i][0]}</a>\n\n"
+            bot.edit_message_text(news_str, call.message.chat.id, call.message.message_id, parse_mode='HTML',
+                                  reply_markup=back_menu())
+
         bot.answer_callback_query(call.id)
+
+
 
     except Exception as e:
         print(e)
