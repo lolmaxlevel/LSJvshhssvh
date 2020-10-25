@@ -7,12 +7,20 @@ import schedule
 import time
 import threading
 from geopy.geocoders import Nominatim
+import difflib
+import news.govno
+import image.image
+from PIL import Image, ImageDraw, ImageFont
 
-users = {}
+token = '1229958568:AAEBxq5OwU3lS8mXax6kIu7eQ1wBd8ak15Y'  # bot constants
+bot = telebot.TeleBot(token)
+
+users = {}                              # constants for db
 with open('users.txt') as json_file:
     users = json.load(json_file)
     print(users.keys())
-    
+
+
 REGIONS = {'111': 'европа', '166': 'СНГ', '318': 'Универсальное', '183': 'Азия', '225': 'Россия',
            '17': 'Северо-Западный федеральный округ', '10857': 'Калининградская область', '22': 'Калининград',
            '10897': 'Мурманская область', '23': 'Мурманск', '10933': 'Республика Карелия', '18': 'Петрозаводск',
@@ -71,35 +79,49 @@ REGIONS = {'111': 'европа', '166': 'СНГ', '318': 'Универсаль�
            '10251': 'Чукотский автономный округ', '11458': 'Анадырь', '11398': 'Камчатский край',
            '78': 'Петропавловск-Камчатский', '11403': 'Магаданская область', '79': 'Магадан',
            '11450': 'Сахалинская область', '80': 'Южно-Сахалинск', '11457': 'Хабаровский край', '76': 'Хабаровск',
-           '11453': 'Комсомольск-на-Амуре'}
+           '11453': 'Комсомольск-на-Амуре'}                          # constants for statistic
 REGIONS_KEYS = list(REGIONS.values())
 
 
-token = '1383445486:AAExUfb7qDLtP7DsaYAZiSd6p_3hfPU1Qgc'
-bot = telebot.TeleBot(token)
-
-def get_key(d, value):
-    for k, v in d.items():
+def get_key(value):
+    for k, v in REGIONS.items():
         if v == value:
             return k
+
+
+def get_statistic(uid):
+    print(uid)
+    statistic = (requests.get('https://yastat.net/s3/milab/2020/covid19-stat/data/data-by-region/'
+                              + str(uid) + '.json')).json()
+    statistic = statistic['info']
+    return statistic
+
 
 def save_users(users):
     with open('users.txt', 'w') as outfile:
         json.dump(users, outfile)
 
+
 def send_message():
-    bot.send_message(633161635, "gaysex")
-    # TODO сделлать рассылку всем пользователям
+    title = news.govno.ones(news.govno.news)
+    for i in list(users.keys()):
+        stat = get_statistic((users[str(i)])[0])
+        bot.send_photo(i, image.image.gen_text(str(stat["cases"]), str(stat["deaths"]), str(stat["cured"]),
+                                                    str(stat["cases_delta"]),
+                                                    str(stat["deaths_delta"]), str(stat["cured_delta"])),
+                       caption=f"Ежедневаная рассылка, что бы отписаться зайдите в настройки\n"
+                               f"А главная нововсть прошедшего дня:\n<a href='{title[1]}'>{title[0]}</a>",
+                                                                                            parse_mode='HTML')
 
-
-schedule.every().day.at("14:19").do(send_message)
+schedule.every().day.at("15:55").do(send_message)
+title = news.govno.ones(news.govno.news)
+print(title)
 
 
 def schedule_task():
     while True:
         schedule.run_pending()
         time.sleep(1)
-
 
 x = threading.Thread(target=schedule_task)
 x.start()
@@ -143,24 +165,27 @@ def settings_menu():
 def back_menu():
     markup = InlineKeyboardMarkup()
     markup.row_width = 1
-    back = InlineKeyboardButton("Назад", callback_data="back1")
+    back = InlineKeyboardButton("Назад", callback_data="back")
     markup.add(back)
     return markup
+
 
 def choose_yes():
     markup = InlineKeyboardMarkup()
     markup.row_width = 1
-    subscribe = InlineKeyboardButton("ДА!(добавить зеленую галочку)", callback_data="subscribe")
+    subscribe = InlineKeyboardButton("Подписаться ✅", callback_data="subscribe")
     markup.add(subscribe)
     return markup
+
 
 def choose_no():
     markup = InlineKeyboardMarkup()
     markup.row_width = 1
-    unsubscribe = InlineKeyboardButton("ДА!(добавить красную галочку)", callback_data="unsubscribe")
+    unsubscribe = InlineKeyboardButton("Отписаться ❌", callback_data="unsubscribe")
     markup.add(unsubscribe)
     return markup
-                    
+
+
 def obrabotka_location(message):
     if message.content_type == 'location':
         bot.delete_message(message.chat.id, message.message_id)
@@ -168,11 +193,18 @@ def obrabotka_location(message):
         location = geolocator.reverse(f"{str(message.location.latitude)}, {str(message.location.longitude)}")
         city = str(location).split(', ')[5]
         try:
-            code = (difflib.get_close_matches(str(message.text), REGIONS_KEYS))[0]
+            code = (difflib.get_close_matches(str(city), REGIONS_KEYS))[0]
         except:
             code = 'None'
-        users[str(call.message.chat.id)][0] = code
-        bot.send_message(message.chat.id, f'Ваш город: {REGIONS[code]}\nКод города: {code}',  reply_markup=back_menu())
+        if users[str(message.chat.id)][0] is None:
+            users[str(message.chat.id)][0] = get_key(code)
+            save_users(users)
+        stat = get_statistic((users[str(message.chat.id)])[0])
+        bot.send_message(message.chat.id,f'Статистика по региону: {stat["full_name"]}\n'
+                              f'Всего заражено: {stat["cases"]} новых случаев {stat["cases_delta"]}\n'
+                              f'Выздоровело: {stat["cured"]} новых случаев {stat["cured_delta"]}\n'
+                              f'Умерло: {stat["deaths"]} новых случаев {stat["deaths_delta"]}',
+                              reply_markup=back_menu())
     else:
         try:
             bot.delete_message(message.chat.id, message.message_id)
@@ -180,19 +212,28 @@ def obrabotka_location(message):
             pass
         bot.send_message(message.chat.id, "Похоже вы отправили мне не то. Повторите попытку:", reply_markup=menu())
 
-def obrabotka(message):
-    reg = difflib.get_close_matches(str(message.text), REGIONS_KEYS)
-    print(reg)
-    users[str(message.chat.id)][0] = get_key(reg[0])
-    save_users(users)
-    bot.send_message(message.chat.id, f"Ваш регион был установлен на {reg[0]}", reply_markup=menu())
 
+def obrabotka(message):
+    try:
+        reg = difflib.get_close_matches(str(message.text), REGIONS_KEYS)
+        print(reg)
+        users[str(message.chat.id)][0] = get_key(reg[0])
+        save_users(users)
+        stat = get_statistic(get_key(reg[0]))
+        bot.send_message(message.chat.id, f'Статистика по региону: {stat["full_name"]}\n'
+                                          f'Всего заражено: {stat["cases"]} новых случаев {stat["cases_delta"]}\n'
+                                          f'Выздоровело: {stat["cured"]} новых случаев {stat["cured_delta"]}\n'
+                                          f'Умерло: {stat["deaths"]} новых случаев {stat["deaths_delta"]}',
+                         reply_markup=back_menu())
+    except Exception as e:
+        bot.send_message(message.chat.id,"Вы ввели какую-то белебрду, попробуйте снова", reply_markup=menu())
 
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.delete_message(message.chat.id, message.message_id)
-    bot.send_message(message.chat.id, "всем привет ето коронавирус бот тут мы будем слать вам спам и рофлан приколы",
+    bot.send_message(message.chat.id, "Привет! Этот бот поможет тебе узнать актуальную информацию о коронавирусе в "
+                                      "твоем районе.\nВыбери действие:",
                      reply_markup=menu())
     if str(message.chat.id) not in users:
         users[str(message.chat.id)] = [None, False]
@@ -206,36 +247,35 @@ def error(message):
         bot.delete_message(message.chat.id, message.message_id)
     except:
         pass
+    print(type(message.chat.id))
     bot.send_message(message.chat.id, 'Воспользуйтесь предложенными кнопками. '
                                       'Если кнопки исчезли, введите команду /start')
 
 
-@bot.message_handler(
-    content_types=['location'])
-def govno(message):
-    print(message)
+@bot.message_handler(content_types=['location'])
+def skhgjlh(message):
+    obrabotka_location(message)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     try:
-
         if call.data == "subscription":
             if users[str(call.message.chat.id)][1]:
-                bot.edit_message_text("У вас активирована подписка, хотите отменить?", call.message.chat.id,
+                bot.edit_message_text("Состояние подписки: активна", call.message.chat.id,
                                       call.message.message_id, reply_markup=choose_no())
             else:
-                bot.edit_message_text("Хотите что бы мы отправляли вам статистику каждый день в 9 утра?",
+                bot.edit_message_text("Состояние подписки: не активна",
                                       call.message.chat.id,
                                       call.message.message_id, reply_markup=choose_yes())
         elif call.data == "subscribe":
-            bot.edit_message_text("Теперь вы подписаны и будете получать новости каждый день в 9 утра",
+            bot.edit_message_text("Вы подписаны! ✅",
                                   call.message.chat.id,
                                   call.message.message_id, reply_markup=menu())
             users[str(call.message.chat.id)][1] = True
             save_users(users)
         elif call.data == "unsubscribe":
-            bot.edit_message_text("Вы отписались и еперь вы не будете получать новости каждый день в 9 утра",
+            bot.edit_message_text("Вы отписались и теперь не будете получать новости каждый день.",
                                   call.message.chat.id,
                                   call.message.message_id, reply_markup=menu())
             users[str(call.message.chat.id)][1] = False
@@ -243,25 +283,34 @@ def callback_query(call):
 
         elif call.data == "back":
             bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(call.message.chat.id, "ч0 делать будем", reply_markup=menu())
-                    
+            bot.send_message(call.message.chat.id, "Выберите действие:", reply_markup=menu())
+
         elif call.data == "settings":
-            bot.edit_message_text("Что будем настраивать",
+            bot.edit_message_text("Настройки:",
                                   call.message.chat.id,
                                   call.message.message_id, reply_markup=settings_menu())
-                    
-                    
+
         elif call.data == 'statistic_by_location':
-            location = bot.edit_message_text('Если хочешь узнать статистику по коронавирусу в своем регионе, просто отправь мне свою геолокацию. Если ты хочешь добавить какой-либо город как постоянный, воспользуйся кнопкой "Статистика" в главном меню.', call.message.chat.id, call.message.message_id,)
+            location = bot.edit_message_text(
+                'Если хочешь узнать статистику по коронавирусу в своем регионе, просто отправь мне свою геолокацию. '
+                'Если ты хочешь добавить какой-либо город как постоянный, воспользуйся кнопкой "Статистика" в главном '
+                'меню.',
+                call.message.chat.id, call.message.message_id, reply_markup=back_menu())
             bot.register_next_step_handler(location, obrabotka_location)
 
         elif call.data == 'statistic':
             if users[str(call.message.chat.id)][0] is None:
-                bot.send_message(call.message.chat.id, "Ух ты! Похоже у вас не настроена ваша постоянная локация!")
-                text = bot.send_message(call.message.chat.id, "Давайте настроим!\n Отправьте ваш постоянный регион")
+                text = bot.send_message(call.message.chat.id, "Ух ты! Похоже у Вас не настроена ваша постоянная "
+                                                              "локация!\nДавайте настроим! Отправьте город в котором "
+                                                              "вы живёте")
                 bot.register_next_step_handler(text, obrabotka)
-            # TODO сделать отправление статистики
-
+            else:
+                stat = get_statistic((users[str(call.message.chat.id)])[0])
+                bot.edit_message_text(f'Статистика по региону: {stat["full_name"]}\n'
+                                      f'Всего заражено: {stat["cases"]} новых случаев {stat["cases_delta"]}\n'
+                                      f'Выздоровело: {stat["cured"]} новых случаев {stat["cured_delta"]}\n'
+                                      f'Умерло: {stat["deaths"]} новых случаев {stat["deaths_delta"]}',
+                                      call.message.chat.id, call.message.message_id, reply_markup=back_menu())
         bot.answer_callback_query(call.id)
 
     except Exception as e:
