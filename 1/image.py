@@ -5,24 +5,24 @@ im = Image.open('photo/krut.jpg')
 
 def gen_text(data_infected, data_dead, data_recovered):
     draw_text = ImageDraw.Draw(im)
-    font = ImageFont.truetype("arial.ttf", 30)
+    font = ImageFont.truetype('Times.ttc',120)
     draw_text.text(
-        (315, 30),
+        (1000, 200),
         data_infected,
         font=font,
-        fill=('#1C0606')
+        fill=('#B22222')
     )
     draw_text.text(
-        (140, 120),
+        (350, 1000),
         data_dead,
         font=font,
-        fill=('#1C0606')
+        fill=('#FF0000')
     )
     draw_text.text(
-        (520, 120),
+        (1600, 1000),
         data_recovered,
         font=font,
-        fill=('#1C0606')
+        fill=('#32CD32')
     )
     im.show()
 
